@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -41,7 +42,7 @@ var dataCache = struct {
 func main() {
 	router := gin.Default()
 	config := cors.Config{
-		AllowOrigins:     []string{"http://localhost:5173"},
+		AllowOrigins:     []string{"http://localhost:5174"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
@@ -66,5 +67,6 @@ func getMeta(c *gin.Context) {
 	var data QueryString
 	c.Bind(&data)
 	DTO := database.FetchMetaData(c, data.Region, data.Source)
+	fmt.Print(DTO.Count)
 	c.JSON(200, DTO)
 }

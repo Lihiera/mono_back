@@ -175,8 +175,12 @@ func FetchPageData(ctx context.Context, region string, page int, source string) 
 	if dbUrl == "" {
 		log.Fatal("please set env variable")
 	}
-
-	conn, err := pgx.Connect(ctx, dbUrl)
+	config, err := pgx.ParseConfig(dbUrl)
+	if err != nil {
+		log.Fatal(err)
+	}
+	config.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+	conn, err := pgx.ConnectConfig(ctx, config)
 	if err != nil {
 		log.Fatalf("fail to connect to the database: %v\n", err)
 	}
@@ -304,7 +308,7 @@ func (r *MiDB) ToDTO() Item {
 	res.Rank = r.Rank
 	res.PriceRange = r.PriceRank
 	res.Image = r.Image
-	res.URL = r.URL
+	res.URL = "https://guide.michelin.com" + r.URL
 	return res
 }
 
