@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
@@ -42,7 +43,7 @@ var dataCache = struct {
 func main() {
 	router := gin.Default()
 	config := cors.Config{
-		AllowOrigins:     []string{"http://localhost:5174"},
+		AllowOrigins:     []string{"https://lihiera.github.io/monobib", "http://localhost:5173"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
@@ -52,7 +53,11 @@ func main() {
 	router.Use(cors.New(config))
 	router.POST("/result", getData)
 	router.POST("/metadata", getMeta)
-	router.Run() // listens on 0.0.0.0:8080 by default
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	router.Run(":" + port) // listens on 0.0.0.0:8080 by default
 }
 
 func getData(c *gin.Context) {
