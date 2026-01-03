@@ -53,6 +53,11 @@ func main() {
 	router.Use(cors.New(config))
 	router.POST("/result", getData)
 	router.POST("/metadata", getMeta)
+	router.GET("/ping", func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"message": "pong",
+		})
+	})
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
