@@ -122,11 +122,20 @@ func (s *Server) readyz(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
 	defer cancel()
 
-	if err := s.db.Ping(ctx); err != nil {
+	var ok int
+	if err := s.db.QueryRow(ctx, "SELECT 1").Scan(&ok); err != nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"status":   "unavailable",
 			"database": "unavailable",
 			"message":  "Database is temporarily unavailable.",
+		})
+		return
+	}
+	if ok != 1 {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"status":   "unavailable",
+			"database": "unavailable",
+			"message":  "Database readiness check returned an unexpected result.",
 		})
 		return
 	}

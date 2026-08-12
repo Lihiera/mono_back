@@ -90,7 +90,7 @@ Example response:
 }
 ```
 
-`GET /readyz` should check whether Supabase is currently reachable by calling `db.Ping(ctx)` with a short timeout.
+`GET /readyz` should check whether Supabase is currently reachable by running `SELECT 1` with a short timeout. This verifies that the pool can acquire a connection and execute a minimal query.
 
 Ready response:
 
@@ -162,7 +162,7 @@ Recommended validation error:
 - The backend creates one `pgxpool.Pool` at startup and reuses it for `/result`, `/metadata`, and `/readyz`.
 - `dbPool` is not a global variable.
 - `/healthz` responds without touching the database.
-- `/readyz` returns `200` when Supabase can be pinged and `503` when it cannot.
+- `/readyz` returns `200` when Supabase can execute `SELECT 1` and `503` when it cannot.
 - A failed `/result` or `/metadata` database query returns an English JSON error and does not stop the Go process.
 - Request-time code no longer calls `log.Fatal`.
 - The backend still supports environment-based deployment configuration.
