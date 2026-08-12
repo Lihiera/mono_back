@@ -186,6 +186,7 @@ func FetchMetaData(ctx context.Context, db *pgxpool.Pool, region string, source 
 	if err != nil {
 		return MetaDTO{}, fmt.Errorf("failed to query metadata: %w", err)
 	}
+	defer rows.Close()
 
 	var records []MetaDB
 	var res []MetaItem
@@ -198,7 +199,6 @@ func FetchMetaData(ctx context.Context, db *pgxpool.Pool, region string, source 
 		}
 		records = append(records, r)
 	}
-	rows.Close()
 
 	if err := rows.Err(); err != nil {
 		return MetaDTO{}, fmt.Errorf("failed to traverse metadata query results: %w", err)

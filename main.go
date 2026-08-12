@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/Lihiera/mono_back/database"
@@ -17,32 +16,9 @@ import (
 )
 
 type QueryString struct {
-	Region    string   `form:"region"`
-	Cuisines  []string `form:"cuisines"`
-	PriceLow  int      `form:"priceLow"`
-	PriceHigh int      `form:"priceHigh"`
-	Source    string   `form:"source"`
-	Page      int      `form:"page"`
-}
-
-type cache struct {
-	sync.RWMutex
-	data     map[string]map[string]interface{}
-	category map[string]map[string]int
-}
-
-var dataCache = struct {
-	MiCache   cache
-	TabeCache cache
-}{
-	MiCache: cache{
-		data:     make(map[string]map[string]interface{}),
-		category: make(map[string]map[string]int),
-	},
-	TabeCache: cache{
-		data:     make(map[string]map[string]interface{}),
-		category: make(map[string]map[string]int),
-	},
+	Region string `form:"region"`
+	Source string `form:"source"`
+	Page   int    `form:"page"`
 }
 
 type Server struct {
