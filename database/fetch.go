@@ -3,18 +3,15 @@ package database
 import (
 	"context"
 	"fmt"
-	"log"
-	"os"
 	"strings"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/joho/godotenv"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // The types for fetching data from database
 type DataFetcher interface {
-	GetDataFromDatabase(ctx context.Context, conn *pgx.Conn, region string, page int) ([]Item, error)
+	GetDataFromDatabase(ctx context.Context, db *pgxpool.Pool, region string, page int) ([]Item, error)
 }
 type TabeFetcher []TabeDB
 type MiFetcher []MiDB
@@ -90,12 +87,12 @@ type Item struct {
 }
 
 // Implementation the fetching interface
-func (f *TabeFetcher) GetDataFromDatabase(ctx context.Context, conn *pgx.Conn, region string, page int) ([]Item, error) {
+func (f *TabeFetcher) GetDataFromDatabase(ctx context.Context, db *pgxpool.Pool, region string, page int) ([]Item, error) {
 	offset := 10 * page
 	sql := `SELECT id, name, cuisine, lat, lng, city_area, region, rank, price_range, image, url FROM tabelog WHERE region=$1 ORDER BY id OFFSET $2 LIMIT 10`
-	rows, err := conn.Query(ctx, sql, region, offset)
+	rows, err := db.Query(ctx, sql, region, offset)
 	if err != nil {
-		return nil, fmt.Errorf(": Failed to query data: %w\n", err)
+		return nil, fmt.Errorf("failed to query tabelog data: %w", err)
 	}
 	defer rows.Close()
 
@@ -106,28 +103,27 @@ func (f *TabeFetcher) GetDataFromDatabase(ctx context.Context, conn *pgx.Conn, r
 		err := rows.Scan(&rTabe.ID, &rTabe.Name, &rTabe.Cuisines, &rTabe.Lat, &rTabe.Lng, &rTabe.CityArea, &rTabe.Region, &rTabe.Rank, &rTabe.PriceRange, &rTabe.Image, &rTabe.URL)
 
 		if err != nil {
-			return nil, fmt.Errorf("Failed to scan data: %w\n", err)
+			return nil, fmt.Errorf("failed to scan tabelog data: %w", err)
 		}
 		*f = append(*f, rTabe)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("Error traversing query results: %w\n", err)
+		return nil, fmt.Errorf("failed to traverse tabelog query results: %w", err)
 	}
 
-	fmt.Println("✅ Query successful:")
 	for _, r := range *f {
 		res = append(res, r.ToDTO())
 	}
 	return res, nil
 }
 
-func (f *MiFetcher) GetDataFromDatabase(ctx context.Context, conn *pgx.Conn, region string, page int) ([]Item, error) {
+func (f *MiFetcher) GetDataFromDatabase(ctx context.Context, db *pgxpool.Pool, region string, page int) ([]Item, error) {
 	offset := 10 * page
 	sql := `SELECT id, name, cuisine, lat, lng, area, region, rank, price_category, image, url FROM michelin WHERE region=$1 ORDER BY id OFFSET $2 LIMIT 10`
-	rows, err := conn.Query(ctx, sql, region, offset)
+	rows, err := db.Query(ctx, sql, region, offset)
 	if err != nil {
-		return nil, fmt.Errorf(": Failed to query data: %w\n", err)
+		return nil, fmt.Errorf("failed to query michelin data: %w", err)
 	}
 	defer rows.Close()
 
@@ -138,16 +134,15 @@ func (f *MiFetcher) GetDataFromDatabase(ctx context.Context, conn *pgx.Conn, reg
 		err = rows.Scan(&rMi.ID, &rMi.Name, &rMi.Cuisines, &rMi.Lat, &rMi.Lng, &rMi.Area, &rMi.Region, &rMi.Rank, &rMi.PriceRank, &rMi.Image, &rMi.URL)
 
 		if err != nil {
-			return nil, fmt.Errorf("Failed to scan data: %w\n", err)
+			return nil, fmt.Errorf("failed to scan michelin data: %w", err)
 		}
 		*f = append(*f, rMi)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("Error traversing query results: %w\n", err)
+		return nil, fmt.Errorf("failed to traverse michelin query results: %w", err)
 	}
 
-	fmt.Println("✅ Query successful:")
 	for _, r := range *f {
 		res = append(res, r.ToDTO())
 	}
@@ -166,71 +161,31 @@ func MakeFetcher(source string) DataFetcher {
 	return nil
 }
 
-func FetchPageData(ctx context.Context, region string, page int, source string) []Item {
-	err := godotenv.Load()
-	if err != nil {
-		log.Println("cannot load .env file")
-	}
-	dbUrl := os.Getenv("SUPABASE_DB_URL")
-	if dbUrl == "" {
-		log.Fatal("please set env variable")
-	}
-	config, err := pgx.ParseConfig(dbUrl)
-	if err != nil {
-		log.Fatal(err)
-	}
-	config.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
-	conn, err := pgx.ConnectConfig(ctx, config)
-	if err != nil {
-		log.Fatalf("fail to connect to the database: %v\n", err)
-	}
-	defer conn.Close(context.Background())
-
-	fmt.Println("🎉 success on connecting to the database!")
-
-	fmt.Printf("\n--> Searching for %s data... in %s database", region, source)
+func FetchPageData(ctx context.Context, db *pgxpool.Pool, region string, page int, source string) ([]Item, error) {
 	fetcher := MakeFetcher(source)
-	res, err := fetcher.GetDataFromDatabase(ctx, conn, region, page)
-	if err != nil {
-		log.Fatal(err)
+	if fetcher == nil {
+		return nil, fmt.Errorf("invalid source: %s", source)
 	}
-	return res
+	return fetcher.GetDataFromDatabase(ctx, db, region, page)
 }
 
-func FetchMetaData(ctx context.Context, region string, source string) MetaDTO {
-	err := godotenv.Load()
-	if err != nil {
-		log.Println("cannot load .env file")
-	}
-	dbUrl := os.Getenv("SUPABASE_DB_URL")
-	if dbUrl == "" {
-		log.Fatal("please set env variable")
-	}
-
-	conn, err := pgx.Connect(ctx, dbUrl)
-	if err != nil {
-		log.Fatalf("fail to connect to the database: %v\n", err)
-	}
-	defer conn.Close(context.Background())
-
-	fmt.Println("🎉 success on connecting to the database!")
-
-	fmt.Printf("\n--> Searching for %s metadata... in %s database", region, source)
+func FetchMetaData(ctx context.Context, db *pgxpool.Pool, region string, source string) (MetaDTO, error) {
 	var totalCount int
 	var countsql string
 	var locsql string
 	if source == "tabelog" {
 		countsql = `SELECT COUNT(*) FROM tabelog WHERE region=$1`
 		locsql = `SELECT id, name, cuisine, lat, lng, image, url FROM tabelog WHERE region=$1`
-	} else {
+	} else if source == "michelin" {
 		countsql = `SELECT COUNT(*) FROM michelin WHERE region=$1`
 		locsql = `SELECT id, name, cuisine, lat, lng, image, url FROM michelin WHERE region=$1`
+	} else {
+		return MetaDTO{}, fmt.Errorf("invalid source: %s", source)
 	}
-	rows, err := conn.Query(ctx, locsql, region)
+	rows, err := db.Query(ctx, locsql, region)
 	if err != nil {
-		log.Fatalf(": Failed to query data: %v\n", err)
+		return MetaDTO{}, fmt.Errorf("failed to query metadata: %w", err)
 	}
-	defer rows.Close()
 
 	var records []MetaDB
 	var res []MetaItem
@@ -239,23 +194,23 @@ func FetchMetaData(ctx context.Context, region string, source string) MetaDTO {
 		var r MetaDB
 		err := rows.Scan(&r.ID, &r.Name, &r.Cuisines, &r.Lat, &r.Lng, &r.Image, &r.URL)
 		if err != nil {
-			log.Fatalf("Failed to scan data: %v\n", err)
+			return MetaDTO{}, fmt.Errorf("failed to scan metadata: %w", err)
 		}
 		records = append(records, r)
 	}
+	rows.Close()
 
 	if err := rows.Err(); err != nil {
-		log.Fatalf("Error traversing query results: %v\n", err)
+		return MetaDTO{}, fmt.Errorf("failed to traverse metadata query results: %w", err)
 	}
-	if err := conn.QueryRow(ctx, countsql, region).Scan(&totalCount); err != nil {
-		log.Fatalf("Error traversing query results: %v\n", err)
+	if err := db.QueryRow(ctx, countsql, region).Scan(&totalCount); err != nil {
+		return MetaDTO{}, fmt.Errorf("failed to query metadata count: %w", err)
 	}
 
-	fmt.Println("✅ Query successful:")
 	for _, r := range records {
 		res = append(res, r.ToDTO())
 	}
-	return MetaDTO{Data: res, Count: totalCount}
+	return MetaDTO{Data: res, Count: totalCount}, nil
 }
 
 func rangeTOString(p pgtype.Range[pgtype.Numeric]) string {
